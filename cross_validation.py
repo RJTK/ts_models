@@ -38,7 +38,8 @@ def cx_validate_opt(Y_train, Z_train, Y_test, Z_test, f, lmbda_min = 0,
 
   return B_star, lmbda_star, err_star
   
-def cx_validate(Y_train, Z_train, Y_test, Z_test, Lmbda, f, **kwargs):
+def cx_validate(Y_train, Z_train, Y_test, Z_test, Lmbda, f, 
+                ret_path = False, **kwargs):
   '''
   Train the model given by f on the data (Y_train, Z_train) and then
   cycles through the set of parameters given in Lmbda to find the best
@@ -49,9 +50,15 @@ def cx_validate(Y_train, Z_train, Y_test, Z_test, Lmbda, f, **kwargs):
   pbar = ProgressBar(widgets = widgets, maxval = len(Lmbda))
   pbar.start()
   min_err = np.inf
+
+  if ret_path:
+    B_path = []
   for lmbda_i, lmbda in enumerate(Lmbda):
     pbar.update(lmbda_i)
     B = f(Y_train, Z_train, lmbda, **kwargs)
+    if ret_path:
+      B_path.append(B)
+
     Y_hat_test = np.dot(B, Z_test)
     err_test = np.linalg.norm(Y_test - Y_hat_test, 'fro')**2
     errs.append(err_test)
@@ -65,4 +72,9 @@ def cx_validate(Y_train, Z_train, Y_test, Z_test, Lmbda, f, **kwargs):
       min_err = err_test
       lmbda_star = lmbda
   pbar.finish()
+
+  if ret_path:
+    B_path = np.dstack(B_path)
+    return B_star, lmbda_star, errs, B_path
+
   return B_star, lmbda_star, errs

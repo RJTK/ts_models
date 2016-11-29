@@ -121,7 +121,7 @@ def spams_lasso(Y, Z, lmbda):
   B = B.toarray() #Convert from sparse array
   return B.T
 
-def dwglasso(Y, Z, lmbda, eps = 1e-9, mu = 5):
+def dwglasso(Y, Z, lmbda, eps = 1e-12, mu = .1):
   '''
   DWGLASS by ADMM.  lmbda is the regularization term, mu is a
   parameter of the algorithm.  NOTE: The names of lmbda and mu are
@@ -185,7 +185,6 @@ def dwglasso(Y, Z, lmbda, eps = 1e-9, mu = 5):
     Bu = Bu + Bx - Bz
     rel_err_k = rel_err(Bx, Bz)
 #  print ''
-
   return Bx
 #  return (Bx + Bz) / 2. #Could averaging remove zeros?
 
