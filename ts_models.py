@@ -1,9 +1,10 @@
 import numpy as np
 import spams as spm
 
-from spams import lasso, fistaFlat
+from spams import lasso, fistaFlat, proximalFlat
 from scipy.optimize import minimize, differential_evolution
 from numpy.linalg import lstsq
+from scipy.linalg import lu_factor, lu_solve
 
 from data_manipulation import *
 
@@ -17,20 +18,14 @@ SPAMS_TRACE_TOL = 5e-4
 #--SLOPE (Candes)
 def fit_ols(Y, Z):
   '''
-  B = argmin_B ||Y - BZ||_F^2
+  B = argmin_B (0.5)||Y - BZ||_F^2
   '''
-  #ZZT = np.dot(Z, Z.T)
-  #YZT = np.dot(Y, Z.T)
-  #ZZT_inv = np.linalg.inv(ZZT)
-  #B = np.dot(YZT, ZZT_inv)
-  #return B
-
   B, R, rk, s = lstsq(Z.T, Y.T)
   return B.T
 
 def fit_olst(Y, Z, lmbda, ZZT = None):
   '''
-  B = argmin_B ||Y - BZ||_F^2 + lmbda||B||_F^2
+  B = argmin_B (0.5)||Y - BZ||_F^2 + lmbda||B||_F^2
   '''
   #It's obviously bad to directly form the below inverse
   #but since we have the lmbda*I term it shouldn't be
@@ -50,7 +45,7 @@ def spams_trace_setup(Y = None, Z = None):
   '''
   def spams_trace(Y, Z, lmbda):
     '''
-    B = argmin_B ||Y - BZ||_F^2 + lmbda||B||_*
+    B = argmin_B (0.5)||Y - BZ||_F^2 + lmbda||B||_*
     '''
     if spams_trace.B0 is not None:
       B0 = spams_trace.B0
@@ -81,7 +76,7 @@ def spams_glasso_setup(Y = None, Z = None):
   '''
   def spams_glasso(Y, Z, lmbda):
     '''
-    b = argmin_b ||Y - [Z^T (x) I]b||_2^2 + lmbda sum_g\in G ||b_g||_2
+    b = argmin_b (0.5)||Y - [Z^T (x) I]b||_2^2 + lmbda sum_g\in G ||b_g||_2
     (Z^T (x) I) = vec(BZ) (kron product) this is needed to specify groups.
     '''
     if spams_glasso.b0 is not None:
@@ -117,7 +112,7 @@ def spams_glasso_setup(Y = None, Z = None):
 
 def spams_lasso(Y, Z, lmbda):
   '''
-  B = argmin_B ||Y - BZ||_F^2 + lmbda||B||_1
+  B = argmin_B (0.5)||Y - BZ||_F^2 + lmbda||B||_1
   '''
   Y_spm = np.asfortranarray(Y.T)
   Z_spm = np.asfortranarray(Z.T)
@@ -126,15 +121,73 @@ def spams_lasso(Y, Z, lmbda):
   B = B.toarray() #Convert from sparse array
   return B.T
 
-def dwglasso(Y, Z, lmbda):
+def dwglasso(Y, Z, lmbda, eps = 1e-9, mu = 5):
   '''
-  DWGLASSO obtained via separation
-  
-  THIS IS TOTALLY WRONG.  I MADE AN ERROR IN THE DERIVATION.
+  DWGLASS by ADMM.  lmbda is the regularization term, mu is a
+  parameter of the algorithm.  NOTE: The names of lmbda and mu are
+  reversed in the proximal algorithms set of notes.
   '''
-  B0 = fit_olst(Y, Z, lmbda) #starting point
+  #Consider Forming this whole thing in terms of the tilde matrices
+  #so that I only need to run B_to_Bt once at the start and
+  #Bt_to_B once at the end.  These methods take about half the time.
+
+  #NOTE: It may be possible to get faster convergence using a 'smart'
+  #sequence of lmbdas.  However, it would then no longer be possible
+  #to cache the LU factorization.
+  n = Y.shape[0]
+  p = Z.shape[0] / n
+
+  ZZT = np.dot(Z, Z.T)
+  R = (ZZT + np.eye(n*p) / mu).T
+  PLU = lu_factor(R, overwrite_a = True) #CARE, R IS OVERWRITTEN
+
+  ZYT = np.dot(Z, Y.T)
+
+  def proxf(A):
+    '''
+    Proximal operator for f(B) = ||Y - BZ||_F^2
+    A = Bz^(k) - Bu^(k)
+    Returns: Bx^(k + 1)
+    Solves: (PLU)B^T = ZYT + A^T / mu for B
+    '''
+    return (lu_solve(PLU, ZYT + A.T / mu)).T
   
-  return B
+  def proxg(V):
+    '''
+    Proximal operator for g(B) = mu * lmbda * sum_ij[ ||Bij||_2 ]
+    V = Bx^(k + 1) + Bu^(k)
+    Returns: Bu^(k + 1)
+    '''
+    V_spm = np.asfortranarray(V.T)
+    Bu = proximalFlat(V_spm, return_val_loss = False, lambda1 = mu*lmbda,
+                      regul = 'l1l2')
+    Bu = np.array(Bu.T)
+    return Bu
+
+  def rel_err(Bxk, Bzk):
+    return (1./(n**2)) * np.linalg.norm(Bxk - Bzk, 'f')**2
+
+  Bz = fit_olst(Y, Z, lmbda) #Initial guess for Bz
+  Bx, Bu = np.zeros_like(Bz), np.zeros_like(Bz)
+
+  #PERFORM ADMM
+  rel_err_k = rel_err(Bx, Bz)
+  while rel_err_k > eps:
+#    print '(1/n)||Bz - Bx||_F^2 = %f\r' % rel_err_k,
+    A = Bz - Bu
+    Bx = proxf(A)
+
+    U = Bx + Bu
+    Ut = B_to_Bt(U, n, p)
+    Bzt = proxg(Ut)
+    Bz = Bt_to_B(Bzt, n, p)
+
+    Bu = Bu + Bx - Bz
+    rel_err_k = rel_err(Bx, Bz)
+#  print ''
+
+  return Bx
+#  return (Bx + Bz) / 2. #Could averaging remove zeros?
 
 def dwglasso_nm(Y, Z, lmbda):
   '''Function I played with'''

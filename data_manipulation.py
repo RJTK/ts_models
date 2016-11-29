@@ -15,22 +15,30 @@ def load_data(file_name):
   f.close()
   return A
 
+#this is more than 100x faster than the below commented method
 def B_to_Bt(B, n, p):
-  '''B = [B^(1) ... B^(p)], B^(i) \in R^(n, n)'''
-  k = np.array(range(p))
-  Bt = [B[i, j + n * k].reshape((p, 1))
-        for i in range(n) for j in range(n)]
-  Bt = np.hstack(Bt)
-  return Bt
+  return np.hstack((B[i, :].reshape((p, n)) for i in range(n)))
 
+# def B_to_Bt(B, n, p):
+#   '''B = [B^(1) ... B^(p)], B^(i) \in R^(n, n)'''
+#   k = np.array(range(p))
+#   Bt = [B[i, j + n * k].reshape((p, 1))
+#         for i in range(n) for j in range(n)]
+#   Bt = np.hstack(Bt)
+#   return 
+
+#Close to 100x faster than the method below
 def Bt_to_B(Bt, n, p):
-  '''Bt = [B_11 B_12 ... B_nn], B_ij \in R^p'''
-  k = np.array(range(p))
-  B = np.zeros([n, n*p])
-  for i in range(n):
-    for j in range(n):
-      B[i, j + n*k] = Bt[:, n*i + j]
-  return B
+  return np.vstack((Bt[:, n*ki:n*(ki + 1)].ravel() for ki in range(n)))
+
+# def Bt_to_B(Bt, n, p):
+#   '''Bt = [B_11 B_12 ... B_nn], B_ij \in R^p'''
+#   k = np.array(range(p))
+#   B = np.zeros([n, n*p])
+#   for i in range(n):
+#     for j in range(n):
+#       B[i, j + n*k] = Bt[:, n*i + j]
+#   return B
 
 def Z_to_Zt(Z, p):
   '''
