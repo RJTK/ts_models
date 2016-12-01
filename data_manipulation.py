@@ -111,12 +111,12 @@ def vec(A):
   '''Vectorizes A by stacking the columns.  A should be 2D'''
   return A.T.reshape(A.shape[0]*A.shape[1])
 
-def adj_matrix(B, p):
+def adj_matrix(B, p, delta = 0):
   '''Obtain the adjacency matrix of the model B'''
   n = B.shape[0]
   A = sum(np.abs(B[0 : n, k*n : (k + 1)*n])
                 for k in range(0, p))
-  A = np.array(np.abs(A) > 0, dtype = int)
+  A = np.array(np.abs(A) > delta, dtype = int)
   return A.T
 
 def deg_matrix(A):
