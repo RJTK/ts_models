@@ -110,23 +110,25 @@ def spams_glasso_setup(Y = None, Z = None):
     spams_glasso.B0 = None
   return spams_glasso
 
-def spams_lasso(Y, Z, lmbda):
+def spams_lasso(Y, Z, lmbda, numThreads = -1):
   '''
   B = argmin_B (0.5)||Y - BZ||_F^2 + lmbda||B||_1
   '''
   Y_spm = np.asfortranarray(Y.T)
   Z_spm = np.asfortranarray(Z.T)
   B = lasso(Y_spm, Z_spm, lambda1 = lmbda, lambda2 = 0,
-            mode = spm.PENALTY)
+            mode = spm.PENALTY, numThreads = numThreads)
   B = B.toarray() #Convert from sparse array
   return B.T
 
-def dwglasso(Y, Z, lmbda, eps = 1e-12, mu = .1):
+def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1):
   '''
   DWGLASS by ADMM.  lmbda is the regularization term, mu is a
   parameter of the algorithm.  NOTE: The names of lmbda and mu are
   reversed in the proximal algorithms set of notes.
   '''
+  #I should provide warm starts for this function.
+
   #Consider Forming this whole thing in terms of the tilde matrices
   #so that I only need to run B_to_Bt once at the start and
   #Bt_to_B once at the end.  These methods take about half the time.
@@ -172,8 +174,10 @@ def dwglasso(Y, Z, lmbda, eps = 1e-12, mu = .1):
 
   #PERFORM ADMM
   rel_err_k = rel_err(Bx, Bz)
-  while rel_err_k > eps:
+  k = 0
+  while rel_err_k > eps and k < n_iter:
 #    print '(1/n)||Bz - Bx||_F^2 = %f\r' % rel_err_k,
+    k += 1
     A = Bz - Bu
     Bx = proxf(A)
 
@@ -186,7 +190,6 @@ def dwglasso(Y, Z, lmbda, eps = 1e-12, mu = .1):
     rel_err_k = rel_err(Bx, Bz)
 #  print ''
   return Bx
-#  return (Bx + Bz) / 2. #Could averaging remove zeros?
 
 def dwglasso_nm(Y, Z, lmbda):
   '''Function I played with'''
