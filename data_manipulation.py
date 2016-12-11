@@ -1,4 +1,5 @@
 import pickle
+import numba
 
 import numpy as np
 
@@ -71,7 +72,42 @@ def Yt_to_Y(Yt):
   Y = np.vstack(Yt)
   return Y
 
+#numba compiled version is WAY faster
 def build_YZ(D, I, p):
+  '''
+  Builds the Y (output) and Z (input) matrices for the model from
+  a pandas dataframe D and set of indices I.  We need to also provide
+  the lag length of the model, p.
+
+  Y_hat = BZ
+
+  D: Pandas dataframe of data
+  I: Set of indices to use
+  p: Model lag length
+  '''
+  T = len(I)
+  if T == 0:
+    return np.array([]), np.array([])
+  Y = np.array(D[p:]).T
+  X = np.array(D).T
+  n = X.shape[0]
+  
+  @numba.jit(nopython = True, cache = True)
+  def inner_loop(X, n, p, T):
+    Z = np.empty((n*p, T - p))
+    #This ordering is hopefully more memory efficient since numpy
+    #arrays are stored in row-major order Although, perhaps the
+    #compiler would reorder accordingly anyway?
+    for tau in range(0, p):
+      for t in range(0, T - p):
+        Z[n*tau : n*(tau + 1), t] = X[:, p - 1 + t - tau]
+    return Z
+  
+  Z = inner_loop(X, n, p, T)
+  return Y, Z
+
+#I am confident this one is correct
+def build_YZ_old(D, I, p):
   '''
   Builds the Y (output) and Z (input) matrices for the model from
   a pandas dataframe D and set of indices I.  We need to also provide

@@ -27,7 +27,7 @@ def cx_validate_opt(Y_train, Z_train, Y_test, Z_test, f, lmbda_min = 0,
   #Replace this with optimize.minimize for a vector of params
   result = sp_opt.minimize_scalar(opt_f,
                                   bounds = (lmbda_min, lmbda_max),
-                                  method = 'brent',
+                                  method = 'bounded',
                                   tol = CX_VAL_TOL)
   lmbda_star = result.x
   print 'lmbda_star = %f\n' % lmbda_star
