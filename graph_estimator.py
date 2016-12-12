@@ -15,7 +15,8 @@ F_VERIF = 1.0 #This should always be 1
 LAMBDA_MIN = 0.0001
 LAMBDA_MAX = 5000
 
-def estimate_gcg(D, model, p, T, delta = 0, ret_cv_result = False, **kwargs):
+def estimate_gcg(D, model, p, T, delta = 0, ret_cv_result = False,
+                 ret_benchmark_err = False, **kwargs):
   '''
   Estimates a GCG by thresholding an autoregressive model.
   '''
@@ -32,8 +33,16 @@ def estimate_gcg(D, model, p, T, delta = 0, ret_cv_result = False, **kwargs):
                                                 lmbda_max = LAMBDA_MAX,
                                                 **kwargs)
   A_hat = adj_matrix(B_hat, p, delta)
+
+  ret = []
   if ret_cv_result:
-    return A_hat, lmbda_star, err_star / N_test
+    ret.extend([A_hat, lmbda_star, err_star / N_test])
+  if ret_benchmark_err:
+    err_mean = np.linalg.norm(Y_test, ord = 'fro')**2 / N_test
+    ret.append(err_mean)
+
+  if ret_cv_result or ret_benchmark_err:
+    return tuple(ret)
   else:
     return A_hat
 

@@ -121,7 +121,8 @@ def spams_lasso(Y, Z, lmbda, numThreads = -1):
   B = B.toarray() #Convert from sparse array
   return B.T
 
-def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1):
+def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1,
+             numThreads = -1):
   '''
   DWGLASS by ADMM.  lmbda is the regularization term, mu is a
   parameter of the algorithm.  NOTE: The names of lmbda and mu are
@@ -162,7 +163,7 @@ def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1):
     '''
     V_spm = np.asfortranarray(V.T)
     Bu = proximalFlat(V_spm, return_val_loss = False, lambda1 = mu*lmbda,
-                      regul = 'l1l2')
+                      regul = 'l1l2', numThreads = numThreads)
     Bu = np.array(Bu.T)
     return Bu
 

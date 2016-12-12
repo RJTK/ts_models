@@ -107,7 +107,7 @@ def build_YZ(D, I, p):
   return Y, Z
 
 #I am confident this one is correct
-def build_YZ_old(D, I, p):
+def build_YZ_corr(D, I, p):
   '''
   Builds the Y (output) and Z (input) matrices for the model from
   a pandas dataframe D and set of indices I.  We need to also provide
