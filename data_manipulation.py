@@ -131,9 +131,9 @@ def build_YZ_corr(D, I, p):
   Z = Z.T
   return Y, Z
 
-def split_data(D, T, F_train, F_test, F_verif):
+def split_data(D, T, F_train, F_test, F_verif, F_start = 0.0):
   '''Splits the data into separate train, test and verify pieces'''
-  I_train = D.index[0:int(T*F_train)]
+  I_train = D.index[int(T*F_start):int(T*F_train)]
   I_test = D.index[int(T*F_train):int(T*F_test)]
   I_verif = D.index[int(T*F_test):int(T*F_verif)]
 
