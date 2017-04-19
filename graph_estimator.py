@@ -29,6 +29,17 @@ def vote_AoN(A):
   A_hat = np.logical_and.reduce(A)
   return A_hat
 
+def vote_maj(A):
+  '''
+  Produces the final A_hat estimate by a majority vote.  The number
+  of voters should be odd, although this isn't strictly necessary.  If
+  it is even, a majority is still required
+  '''
+  N = len(A)
+  A_hat = sum(A)
+  A_hat = A_hat > (N / 2)
+  return A_hat
+
 def estimate_gcg_vote(D, model, p, T, vote_func, K, F_train = 0.7,
                       delta = 0, ret_cv_result = False,
                       ret_benchmark_err = False, **kwargs):

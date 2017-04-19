@@ -30,7 +30,6 @@ def cx_validate_opt(Y_train, Z_train, Y_test, Z_test, f, lmbda_min = 0,
                                   method = 'brent',
                                   tol = CX_VAL_TOL)
 #                                  options = {'xatol': CX_VAL_TOL})
-  print lmbda_min
   lmbda_star = result.x
   print 'lmbda_star = %f\n' % lmbda_star
 

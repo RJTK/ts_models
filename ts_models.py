@@ -1,7 +1,7 @@
 import numpy as np
 import spams as spm
 
-from spams import lasso, fistaFlat, proximalFlat
+from spams import lasso, lassoWeighted, fistaFlat, proximalFlat
 from scipy.optimize import minimize, differential_evolution
 from numpy.linalg import lstsq
 from scipy.linalg import lu_factor, lu_solve
@@ -33,7 +33,11 @@ def fit_olst(Y, Z, lmbda, ZZT = None):
   if ZZT is None:
     ZZT = np.dot(Z, Z.T)
   tmp = lmbda*np.eye(ZZT.shape[0]) + ZZT
-  tmp = np.linalg.inv(tmp)
+  try:
+    tmp = np.linalg.inv(tmp)
+  except np.linalg.LinAlgError:
+    print 'WARN: SINGULAR MATRIX IN OLST'
+    tmp = np.linalg.pinv(tmp)
   YZT = np.dot(Y, Z.T)
   B = np.dot(YZT, tmp)
   return B
@@ -121,7 +125,23 @@ def spams_lasso(Y, Z, lmbda, numThreads = -1):
   B = B.toarray() #Convert from sparse array
   return B.T
 
-def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1,
+def spams_wlasso(Y, Z, lmbda, g = .01, numThreads = -1):
+  '''
+  B = argmin_B (0.5)||Y - BZ||_F^2 + lmbda||w (.) B||_1
+  Where W = 1 / |B_OLS|^g is the weights.
+
+  This is the weighted LASSO of Zou2006
+  '''
+  W = fit_ols(Y, Z)
+  Y_spm = np.asfortranarray(Y.T)
+  Z_spm = np.asfortranarray(Z.T)
+  W_spm = np.asfortranarray(W.T)
+  B = lassoWeighted(Y_spm, Z_spm, W_spm, lambda1 = lmbda,
+                    mode = spm.PENALTY, numThreads = numThreads)
+  B = B.toarray()
+  return B.T
+
+def dwglasso(Y, Z, lmbda, eps = 1e-12, n_iter = 100, mu = .1,
              numThreads = -1):
   '''
   DWGLASS by ADMM.  lmbda is the regularization term, mu is a
@@ -135,10 +155,13 @@ def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1,
   #Bt_to_B once at the end.  These methods take about half the time.
 
   #NOTE: It may be possible to get faster convergence using a 'smart'
-  #sequence of lmbdas.  However, it would then no longer be possible
+  #sequence of mu.  However, it would then no longer be possible
   #to cache the LU factorization.
   n = Y.shape[0]
   p = Z.shape[0] / n
+
+  if p == 1:
+    return spams_lasso(Y, Z, lmbda, numThreads = numThreads)
 
   ZZT = np.dot(Z, Z.T)
   R = (ZZT + np.eye(n*p) / mu).T
@@ -177,7 +200,7 @@ def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1,
   rel_err_k = rel_err(Bx, Bz)
   k = 0
   while rel_err_k > eps and k < n_iter:
-#    print '(1/n)||Bz - Bx||_F^2 = %f\r' % rel_err_k,
+#    print '(1/n)||Bz - Bx||_F^2 = %0.14f\r' % rel_err_k,
     k += 1
     A = Bz - Bu
     Bx = proxf(A)
@@ -190,7 +213,7 @@ def dwglasso(Y, Z, lmbda, eps = 1e-8, n_iter = 100, mu = .1,
     Bu = Bu + Bx - Bz
     rel_err_k = rel_err(Bx, Bz)
 #  print ''
-  return Bx
+  return Bz
 
 def dwglasso_nm(Y, Z, lmbda):
   '''Function I played with'''
